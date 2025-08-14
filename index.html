@@ -170,6 +170,32 @@
             box-shadow: 0 0 20px rgba(78,205,196,0.3);
         }
 
+        .song-selector {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin: 20px 0;
+            max-width: 400px;
+        }
+
+        .song-btn {
+            padding: 12px 20px;
+            background: rgba(255,255,255,0.1);
+            border: 2px solid rgba(255,255,255,0.3);
+            color: white;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1em;
+        }
+
+        .song-btn.active,
+        .song-btn:hover {
+            background: rgba(255,255,255,0.2);
+            border-color: #ff6b6b;
+            box-shadow: 0 0 20px rgba(255,107,107,0.3);
+        }
+
         .combo-display {
             position: absolute;
             top: 50%;
@@ -238,6 +264,41 @@
             50% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1.1); }
             100% { opacity: 0; transform: translateX(-50%) translateY(-20px) scale(1); }
         }
+
+        .music-controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+            pointer-events: all;
+        }
+
+        .control-btn {
+            padding: 8px 12px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.9em;
+        }
+
+        .control-btn:hover {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .now-playing {
+            position: absolute;
+            bottom: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            font-size: 0.9em;
+            opacity: 0.8;
+        }
     </style>
 </head>
 <body>
@@ -256,15 +317,32 @@
                     Precisión: <span id="accuracy">100</span>%
                 </div>
             </div>
+
+            <div class="music-controls" id="musicControls" style="display: none;">
+                <button class="control-btn" onclick="toggleBackgroundMusic()">🎵 Música</button>
+                <button class="control-btn" onclick="adjustVolume()">🔊 Volumen</button>
+            </div>
+
+            <div class="now-playing" id="nowPlaying" style="display: none;">
+                ♪ Reproduciendo: <span id="currentSong">-</span>
+            </div>
         </div>
 
         <div class="start-screen" id="startScreen">
             <h1>🎹 MAGIC PIANO TILES</h1>
             <div class="instructions">
-                <p>🎵 Toca las baldosas negras al ritmo de la música</p>
+                <p>🎵 Toca las baldosas al ritmo de la música clásica</p>
                 <p>🎯 ¡No toques las baldosas blancas!</p>
                 <p>⚡ Consigue combos para más puntos</p>
-                <p>🏆 ¡Alcanza la mayor puntuación posible!</p>
+                <p>🏆 ¡Cada baldosa reproduce una nota del piano!</p>
+            </div>
+            
+            <div class="song-selector">
+                <h3 style="text-align: center; margin-bottom: 10px;">🎼 Selecciona una Canción:</h3>
+                <button class="song-btn active" data-song="fur-elise">🎹 Para Elisa - Beethoven</button>
+                <button class="song-btn" data-song="moonlight">🌙 Claro de Luna - Debussy</button>
+                <button class="song-btn" data-song="canon">💒 Canon en D - Pachelbel</button>
+                <button class="song-btn" data-song="minute-waltz">💫 Vals del Minuto - Chopin</button>
             </div>
             
             <div class="difficulty-selector">
@@ -276,23 +354,27 @@
             <button class="btn" onclick="iniciarJuego()">🎮 EMPEZAR A TOCAR</button>
             
             <div style="margin-top: 30px; font-size: 0.9em; opacity: 0.7;">
-                <p>🎹 Cada baldosa genera una nota musical diferente</p>
+                <p>🎹 Cada baldosa reproduce notas reales de piano</p>
+                <p>🎼 La música de fondo se sincroniza con tu juego</p>
                 <p>📱 Compatible con dispositivos móviles y táctiles</p>
             </div>
         </div>
 
         <div class="game-over-screen" id="gameOverScreen" style="display: none;">
-            <h2 style="font-size: 2.5em; margin-bottom: 20px; color: #ff6b6b;">🎵 ¡Fin del Juego!</h2>
+            <h2 style="font-size: 2.5em; margin-bottom: 20px; color: #ff6b6b;">🎵 ¡Fin del Concierto!</h2>
             <div style="font-size: 1.5em; margin-bottom: 30px;">
                 <p>Puntuación Final: <span id="finalScore" style="color: #4ecdc4;">0</span></p>
                 <p>Mejor Combo: <span id="bestCombo" style="color: #ffff00;">0</span></p>
                 <p>Precisión Final: <span id="finalAccuracy" style="color: #ff6b6b;">0</span>%</p>
-                <p>Baldosas Tocadas: <span id="tilesHit" style="color: #45b7d1;">0</span></p>
+                <p>Notas Tocadas: <span id="tilesHit" style="color: #45b7d1;">0</span></p>
             </div>
             <button class="btn" onclick="reiniciarJuego()">🔄 JUGAR DE NUEVO</button>
             <button class="btn" onclick="volverMenu()">🏠 MENÚ PRINCIPAL</button>
         </div>
     </div>
+
+    <!-- Tone.js para audio avanzado -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
 
     <script>
         // ========================================
@@ -310,6 +392,9 @@
         let hitTiles = 0;
         let missedTiles = 0;
         let difficulty = 'easy';
+        let selectedSong = 'fur-elise';
+        let backgroundMusicEnabled = true;
+        let volumeLevel = 0.7;
 
         // Configuración de dificultad
         const difficultySettings = {
@@ -318,22 +403,85 @@
             hard: { speed: 4.5, spawnRate: 0.025, minGap: 40 }
         };
 
-        // Sistema de audio
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        const notes = {
-            C4: 261.63,
-            D4: 293.66,
-            E4: 329.63,
-            F4: 349.23,
-            G4: 392.00,
-            A4: 440.00,
-            B4: 493.88,
-            C5: 523.25
+        // Sistema de audio con Tone.js
+        let piano, backgroundSynth, backgroundPattern;
+        let isAudioInitialized = false;
+
+        // Notas musicales más realistas para piano
+        const pianoNotes = [
+            'C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4', 'C5',
+            'D5', 'E5', 'F5', 'G5', 'A5', 'B5', 'C6'
+        ];
+
+        // Melodías de canciones clásicas (simplificadas)
+        const songs = {
+            'fur-elise': {
+                name: 'Para Elisa - Beethoven',
+                melody: ['E5', 'D#5', 'E5', 'D#5', 'E5', 'B4', 'D5', 'C5', 'A4'],
+                tempo: 120,
+                pattern: [0, 1, 0, 1, 0, 2, 3, 4, 5]
+            },
+            'moonlight': {
+                name: 'Claro de Luna - Debussy',
+                melody: ['C#4', 'E4', 'G#4', 'C#5', 'B4', 'A4', 'G#4', 'F#4'],
+                tempo: 80,
+                pattern: [0, 1, 2, 3, 2, 1, 0, 4]
+            },
+            'canon': {
+                name: 'Canon en D - Pachelbel',
+                melody: ['D4', 'A4', 'B4', 'F#4', 'G4', 'D4', 'G4', 'A4'],
+                tempo: 100,
+                pattern: [0, 1, 2, 3, 4, 0, 4, 1]
+            },
+            'minute-waltz': {
+                name: 'Vals del Minuto - Chopin',
+                melody: ['Db5', 'F5', 'Ab5', 'Db6', 'C6', 'Bb5', 'Ab5', 'F5'],
+                tempo: 140,
+                pattern: [0, 1, 2, 3, 2, 1, 0, 1]
+            }
         };
 
-        const noteNames = Object.keys(notes);
         let tiles = [];
         let particles = [];
+        let melodyIndex = 0;
+        let backgroundMelodyIndex = 0;
+
+        async function initializeAudio() {
+            if (isAudioInitialized) return;
+            
+            await Tone.start();
+            
+            // Piano principal para las baldosas
+            piano = new Tone.PolySynth(Tone.Synth, {
+                oscillator: {
+                    type: 'triangle'
+                },
+                envelope: {
+                    attack: 0.02,
+                    decay: 0.1,
+                    sustain: 0.3,
+                    release: 1.2
+                }
+            }).toDestination();
+            
+            // Sintetizador para música de fondo
+            backgroundSynth = new Tone.PolySynth(Tone.Synth, {
+                oscillator: {
+                    type: 'sine'
+                },
+                envelope: {
+                    attack: 0.1,
+                    decay: 0.3,
+                    sustain: 0.4,
+                    release: 2.0
+                }
+            }).toDestination();
+            
+            piano.volume.value = Tone.gainToDb(volumeLevel);
+            backgroundSynth.volume.value = Tone.gainToDb(volumeLevel * 0.3);
+            
+            isAudioInitialized = true;
+        }
 
         function ajustarCanvas() {
             canvas.width = canvas.offsetWidth;
@@ -344,44 +492,86 @@
         window.addEventListener('resize', ajustarCanvas);
 
         // ========================================
-        // SISTEMA DE AUDIO
+        // SISTEMA DE AUDIO MEJORADO
         // ========================================
-        function reproducirNota(frequency, duration = 0.3) {
-            if (audioContext.state === 'suspended') {
-                audioContext.resume();
+        function reproducirNotaPiano(note, duration = '8n') {
+            if (!isAudioInitialized || !piano) return;
+            
+            try {
+                piano.triggerAttackRelease(note, duration);
+            } catch (error) {
+                console.warn('Error reproduciendo nota:', error);
             }
-
-            const oscillator = audioContext.createOscillator();
-            const gainNode = audioContext.createGain();
-            
-            oscillator.connect(gainNode);
-            gainNode.connect(audioContext.destination);
-            
-            oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
-            oscillator.type = 'triangle';
-            
-            gainNode.gain.setValueAtTime(0, audioContext.currentTime);
-            gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.01);
-            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
-            
-            oscillator.start(audioContext.currentTime);
-            oscillator.stop(audioContext.currentTime + duration);
         }
 
         function reproducirSonidoError() {
-            reproducirNota(150, 0.2);
+            if (!isAudioInitialized || !piano) return;
+            piano.triggerAttackRelease('C2', '16n');
         }
 
         function reproducirSonidoCombo() {
-            for (let i = 0; i < 3; i++) {
+            if (!isAudioInitialized || !piano) return;
+            const notes = ['C5', 'E5', 'G5'];
+            notes.forEach((note, index) => {
                 setTimeout(() => {
-                    reproducirNota(notes.C5 + (i * 100), 0.15);
-                }, i * 50);
+                    piano.triggerAttackRelease(note, '16n');
+                }, index * 100);
+            });
+        }
+
+        function startBackgroundMusic() {
+            if (!backgroundMusicEnabled || !isAudioInitialized || !backgroundSynth) return;
+            
+            stopBackgroundMusic();
+            
+            const currentSong = songs[selectedSong];
+            if (!currentSong) return;
+            
+            backgroundPattern = new Tone.Sequence((time, note) => {
+                backgroundSynth.triggerAttackRelease(note, '4n', time);
+                backgroundMelodyIndex = (backgroundMelodyIndex + 1) % currentSong.melody.length;
+            }, currentSong.melody, '2n');
+            
+            Tone.Transport.bpm.value = currentSong.tempo;
+            backgroundPattern.start();
+            Tone.Transport.start();
+            
+            // Actualizar interfaz
+            document.getElementById('currentSong').textContent = currentSong.name;
+            document.getElementById('nowPlaying').style.display = 'block';
+        }
+
+        function stopBackgroundMusic() {
+            if (backgroundPattern) {
+                backgroundPattern.stop();
+                backgroundPattern.dispose();
+                backgroundPattern = null;
+            }
+            Tone.Transport.stop();
+            document.getElementById('nowPlaying').style.display = 'none';
+        }
+
+        function toggleBackgroundMusic() {
+            backgroundMusicEnabled = !backgroundMusicEnabled;
+            
+            if (backgroundMusicEnabled) {
+                startBackgroundMusic();
+            } else {
+                stopBackgroundMusic();
+            }
+        }
+
+        function adjustVolume() {
+            volumeLevel = volumeLevel >= 1 ? 0.3 : volumeLevel + 0.2;
+            
+            if (isAudioInitialized) {
+                if (piano) piano.volume.value = Tone.gainToDb(volumeLevel);
+                if (backgroundSynth) backgroundSynth.volume.value = Tone.gainToDb(volumeLevel * 0.3);
             }
         }
 
         // ========================================
-        // CLASE BALDOSA
+        // CLASE BALDOSA MEJORADA
         // ========================================
         class Tile {
             constructor(lane) {
@@ -393,10 +583,31 @@
                 this.speed = difficultySettings[difficulty].speed;
                 this.hit = false;
                 this.missed = false;
-                this.note = noteNames[Math.floor(Math.random() * noteNames.length)];
-                this.hue = Math.random() * 360;
+                
+                // Nota basada en la melodía de la canción seleccionada
+                const currentSong = songs[selectedSong];
+                if (currentSong && currentSong.melody.length > 0) {
+                    this.note = currentSong.melody[melodyIndex % currentSong.melody.length];
+                    melodyIndex++;
+                } else {
+                    this.note = pianoNotes[Math.floor(Math.random() * pianoNotes.length)];
+                }
+                
+                this.hue = this.getNoteHue();
                 this.glowIntensity = 0;
                 this.scale = 1;
+            }
+
+            getNoteHue() {
+                // Asignar colores basados en la nota
+                const noteMap = {
+                    'C': 0, 'C#': 30, 'Db': 30, 'D': 60, 'D#': 90, 'Eb': 90,
+                    'E': 120, 'F': 150, 'F#': 180, 'Gb': 180, 'G': 210,
+                    'G#': 240, 'Ab': 240, 'A': 270, 'A#': 300, 'Bb': 300, 'B': 330
+                };
+                
+                const noteName = this.note.slice(0, -1);
+                return noteMap[noteName] || Math.random() * 360;
             }
 
             update() {
@@ -417,7 +628,7 @@
             draw() {
                 ctx.save();
                 
-                // Sombra
+                // Sombra colorida basada en la nota
                 ctx.shadowColor = `hsla(${this.hue}, 70%, 50%, 0.8)`;
                 ctx.shadowBlur = this.hit ? 0 : 20 * this.glowIntensity;
                 
@@ -451,12 +662,12 @@
                 ctx.lineWidth = 2;
                 ctx.stroke();
                 
-                // Nota musical
+                // Mostrar nota musical
                 if (!this.hit) {
                     ctx.fillStyle = `rgba(255, 255, 255, ${0.8 * this.glowIntensity})`;
-                    ctx.font = 'bold 24px Arial';
+                    ctx.font = 'bold 20px Arial';
                     ctx.textAlign = 'center';
-                    ctx.fillText(this.note, this.width/2, this.height/2 + 8);
+                    ctx.fillText(this.note, this.width/2, this.height/2 + 6);
                 }
                 
                 ctx.restore();
@@ -495,8 +706,8 @@
                 this.hit = true;
                 this.scale = 1.1;
                 
-                // Reproducir nota
-                reproducirNota(notes[this.note]);
+                // Reproducir nota musical
+                reproducirNotaPiano(this.note, '8n');
                 
                 // Calcular puntuación basada en precisión
                 const hitZone = canvas.height - 200;
@@ -522,6 +733,8 @@
                 // Mostrar indicador de precisión
                 if (accuracy > 0.9) {
                     this.mostrarIndicador("PERFECT!");
+                } else if (accuracy > 0.7) {
+                    this.mostrarIndicador("GOOD!");
                 }
                 
                 // Sonido especial para combos altos
@@ -583,14 +796,13 @@
         // ========================================
         // LÓGICA PRINCIPAL DEL JUEGO
         // ========================================
-        function iniciarJuego() {
-            // Activar contexto de audio
-            if (audioContext.state === 'suspended') {
-                audioContext.resume();
-            }
+        async function iniciarJuego() {
+            // Inicializar audio
+            await initializeAudio();
             
             gameState = 'playing';
             document.getElementById('startScreen').style.display = 'none';
+            document.getElementById('musicControls').style.display = 'flex';
             
             // Resetear variables
             tiles = [];
@@ -601,8 +813,17 @@
             totalTiles = 0;
             hitTiles = 0;
             missedTiles = 0;
+            melodyIndex = 0;
+            backgroundMelodyIndex = 0;
             
             gameSpeed = difficultySettings[difficulty].speed;
+            
+            // Iniciar música de fondo
+            if (backgroundMusicEnabled) {
+                setTimeout(() => {
+                    startBackgroundMusic();
+                }, 500);
+            }
             
             gameLoop();
         }
@@ -670,51 +891,94 @@
             ctx.fillStyle = gradient;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
-            // Líneas de separación entre carriles
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-            ctx.lineWidth = 2;
+            // Líneas de separación entre carriles con efecto de piano
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+            ctx.lineWidth = 3;
             for (let i = 1; i < 4; i++) {
                 const x = (canvas.width / 4) * i;
                 ctx.beginPath();
                 ctx.moveTo(x, 0);
                 ctx.lineTo(x, canvas.height);
                 ctx.stroke();
+                
+                // Efecto de teclas de piano
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(x - 2, 0);
+                ctx.lineTo(x - 2, canvas.height);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(x + 2, 0);
+                ctx.lineTo(x + 2, canvas.height);
+                ctx.stroke();
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+                ctx.lineWidth = 3;
             }
             
-            // Efecto de líneas de velocidad
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+            // Efecto de líneas musicales
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
             ctx.lineWidth = 1;
-            const offset = (Date.now() * gameSpeed * 0.1) % 50;
-            for (let y = -50 + offset; y < canvas.height + 50; y += 50) {
+            const offset = (Date.now() * gameSpeed * 0.1) % 60;
+            for (let y = -60 + offset; y < canvas.height + 60; y += 60) {
                 ctx.beginPath();
                 ctx.moveTo(0, y);
                 ctx.lineTo(canvas.width, y);
                 ctx.stroke();
+            }
+            
+            // Notas musicales flotantes de fondo
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+            ctx.font = '20px Arial';
+            const musicSymbols = ['♪', '♫', '♬', '♩', '♭', '♯'];
+            for (let i = 0; i < 8; i++) {
+                const x = (canvas.width / 8) * i + Math.sin(Date.now() * 0.002 + i) * 20;
+                const y = 100 + Math.sin(Date.now() * 0.003 + i * 2) * 50;
+                const symbol = musicSymbols[i % musicSymbols.length];
+                ctx.fillText(symbol, x, y);
             }
         }
 
         function dibujarZonaToque() {
             const hitZone = canvas.height - 200;
             
-            // Zona de toque principal
+            // Zona de toque principal con efecto de piano
             const gradient = ctx.createLinearGradient(0, hitZone, 0, hitZone + 150);
-            gradient.addColorStop(0, 'rgba(78, 205, 196, 0.3)');
-            gradient.addColorStop(0.5, 'rgba(78, 205, 196, 0.6)');
-            gradient.addColorStop(1, 'rgba(78, 205, 196, 0.3)');
+            gradient.addColorStop(0, 'rgba(78, 205, 196, 0.2)');
+            gradient.addColorStop(0.3, 'rgba(78, 205, 196, 0.4)');
+            gradient.addColorStop(0.7, 'rgba(78, 205, 196, 0.4)');
+            gradient.addColorStop(1, 'rgba(78, 205, 196, 0.2)');
             
             ctx.fillStyle = gradient;
             ctx.fillRect(0, hitZone, canvas.width, 150);
             
-            // Línea de referencia
+            // Línea de referencia principal
             ctx.strokeStyle = '#4ecdc4';
-            ctx.lineWidth = 3;
+            ctx.lineWidth = 4;
             ctx.shadowColor = '#4ecdc4';
-            ctx.shadowBlur = 10;
+            ctx.shadowBlur = 15;
             ctx.beginPath();
             ctx.moveTo(0, hitZone + 75);
             ctx.lineTo(canvas.width, hitZone + 75);
             ctx.stroke();
             ctx.shadowBlur = 0;
+            
+            // Líneas de referencia adicionales
+            ctx.strokeStyle = 'rgba(78, 205, 196, 0.3)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, hitZone + 25);
+            ctx.lineTo(canvas.width, hitZone + 25);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(0, hitZone + 125);
+            ctx.lineTo(canvas.width, hitZone + 125);
+            ctx.stroke();
+            
+            // Indicador de tempo visual
+            const pulseIntensity = Math.sin(Date.now() * 0.01) * 0.2 + 0.8;
+            ctx.fillStyle = `rgba(78, 205, 196, ${0.1 * pulseIntensity})`;
+            ctx.fillRect(0, hitZone + 50, canvas.width, 50);
         }
 
         function actualizarParticulas() {
@@ -723,15 +987,18 @@
                 particle.y += particle.vy;
                 particle.vy += 0.3; // Gravedad
                 particle.life -= 0.02;
+                particle.size *= 0.98; // Reducir tamaño gradualmente
                 
                 if (particle.life <= 0) {
                     particles.splice(index, 1);
                     return;
                 }
                 
-                // Dibujar partícula
+                // Dibujar partícula con efecto de brillo
                 ctx.save();
                 ctx.globalAlpha = particle.life;
+                ctx.shadowColor = particle.color;
+                ctx.shadowBlur = 10;
                 ctx.fillStyle = particle.color;
                 ctx.beginPath();
                 ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
@@ -742,6 +1009,12 @@
 
         function terminarJuego() {
             gameState = 'gameOver';
+            
+            // Detener música de fondo
+            stopBackgroundMusic();
+            
+            // Ocultar controles de música
+            document.getElementById('musicControls').style.display = 'none';
             
             // Actualizar estadísticas finales
             document.getElementById('finalScore').textContent = score.toLocaleString();
@@ -761,8 +1034,10 @@
 
         function volverMenu() {
             gameState = 'menu';
+            stopBackgroundMusic();
             document.getElementById('gameOverScreen').style.display = 'none';
             document.getElementById('startScreen').style.display = 'flex';
+            document.getElementById('musicControls').style.display = 'none';
         }
 
         // ========================================
@@ -793,7 +1068,98 @@
             });
         });
 
+        // Controles de teclado para una experiencia más rica
+        document.addEventListener('keydown', (e) => {
+            if (gameState !== 'playing') return;
+            
+            const keyMap = {
+                'a': 0, 's': 1, 'd': 2, 'f': 3,
+                'A': 0, 'S': 1, 'D': 2, 'F': 3,
+                '1': 0, '2': 1, '3': 2, '4': 3
+            };
+            
+            if (keyMap.hasOwnProperty(e.key)) {
+                const lane = keyMap[e.key];
+                const x = (canvas.width / 4) * lane + (canvas.width / 8);
+                const y = canvas.height - 125; // Zona de toque
+                manejarToque(x, y);
+            }
+        });
+
         function manejarToque(x, y) {
             let hit = false;
             
-            // Verificar si se
+            // Verificar si se tocó alguna baldosa
+            for (let i = tiles.length - 1; i >= 0; i--) {
+                const tile = tiles[i];
+                if (tile.checkHit(x, y)) {
+                    hit = true;
+                    break;
+                }
+            }
+            
+            // Si no se tocó ninguna baldosa, penalizar
+            if (!hit) {
+                reproducirSonidoError();
+                if (combo > 0) {
+                    combo = 0;
+                    document.getElementById('combo').textContent = combo;
+                }
+            }
+        }
+
+        // ========================================
+        // INICIALIZACIÓN Y CONFIGURACIÓN
+        // ========================================
+        
+        // Selección de dificultad
+        document.querySelectorAll('.difficulty-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.difficulty-btn').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                difficulty = e.target.dataset.difficulty;
+            });
+        });
+
+        // Selección de canción
+        document.querySelectorAll('.song-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.song-btn').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                selectedSong = e.target.dataset.song;
+                melodyIndex = 0; // Reiniciar índice de melodía
+            });
+        });
+
+        // Inicialización del juego
+        document.addEventListener('DOMContentLoaded', () => {
+            // Mostrar instrucciones de teclado en pantallas más grandes
+            if (window.innerWidth > 768) {
+                const instructions = document.querySelector('.instructions');
+                instructions.innerHTML += '<p>⌨️ Usa las teclas A, S, D, F o 1, 2, 3, 4 para tocar</p>';
+            }
+        });
+
+        // Gestión de visibilidad para pausar música cuando la pestaña no está activa
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden && gameState === 'playing') {
+                stopBackgroundMusic();
+            } else if (!document.hidden && gameState === 'playing' && backgroundMusicEnabled) {
+                setTimeout(() => startBackgroundMusic(), 500);
+            }
+        });
+
+        // Precargar audio al hacer hover sobre el botón de inicio
+        document.querySelector('.btn').addEventListener('mouseenter', () => {
+            if (!isAudioInitialized) {
+                initializeAudio().catch(console.warn);
+            }
+        });
+
+        console.log('🎹 Magic Piano Tiles cargado exitosamente!');
+        console.log('🎵 Canciones disponibles:', Object.keys(songs).map(key => songs[key].name));
+        console.log('⌨️ Controles: Mouse/Touch o teclas A,S,D,F / 1,2,3,4');
+    </script>
+</body>
+</html>
+                    
