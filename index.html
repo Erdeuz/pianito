@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Magic Piano Tiles</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+        }
+
+        .game-container {
+            width: 100vw;
+            height: 100vh;
+            max-width: 600px;
+            background: linear-gradient(180deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 0 50px rgba(0,0,0,0.5);
+        }
+
+        #gameCanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            cursor: pointer;
+        }
+
+        .ui-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .score-display {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 1.5em;
+            font-weight: bold;
+            text-shadow: 0 0 10px rgba(255,255,255,0.5);
+        }
+
+        .score-item {
+            background: rgba(0,0,0,0.3);
+            padding: 10px 15px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .start-screen, .game-over-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(45deg, rgba(0,0,0,0.9), rgba(26,26,46,0.95));
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 20;
+            pointer-events: all;
+            backdrop-filter: blur(20px);
+        }
+
+        .start-screen h1 {
+            font-size: 3.5em;
+            margin-bottom: 20px;
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: rainbow 3s ease-in-out infinite;
+            text-align: center;
+        }
+
+        @keyframes rainbow {
+            0%, 100% { filter: hue-rotate(0deg); }
+            50% { filter: hue-rotate(180deg); }
+        }
+
+        .btn {
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+            border: none;
+            color: white;
+            padding: 15px 30px;
+            font-size: 1.2em;
+            font-weight: bold;
+            border-radius: 25px;
+            cursor: pointer;
+            margin: 10px;
+            transition: all 0.3s ease;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .btn:hover::before {
+            left: 100%;
+        }
+
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.4);
+        }
+
+        .instructions {
+            text-align: center;
+            font-size: 1.1em;
+            margin: 30px 20px;
+            opacity: 0.9;
+            line-height: 1.6;
+        }
+
+        .difficulty-selector {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+        }
+
+        .difficulty-btn {
+            padding: 10px 20px;
+            background: rgba(255,255,255,0.1);
+            border: 2px solid rgba(255,255,255,0.3);
+            color: white;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .difficulty-btn.active,
+        .difficulty-btn:hover {
+            background: rgba(255,255,255,0.2);
+            border-color: #4ecdc4;
+            box-shadow: 0 0 20px rgba(78,205,196,0.3);
+        }
+
+        .combo-display {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 3em;
+            font-weight: bold;
+            color: #ffff00;
+            text-shadow: 0 0 20px #ffff00;
+            opacity: 0;
+            pointer-events: none;
+            animation: comboAnim 1s ease-out;
+        }
+
+        @keyframes comboAnim {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+            50% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
+        }
+
+        .particle {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            background: radial-gradient(circle, #fff, transparent);
+            border-radius: 50%;
+            pointer-events: none;
+            animation: particle 1s ease-out forwards;
+        }
+
+        @keyframes particle {
+            0% { opacity: 1; transform: scale(1); }
+            100% { opacity: 0; transform: scale(0.3) translateY(-100px); }
+        }
+
+        @media (max-width: 768px) {
+            .start-screen h1 {
+                font-size: 2.5em;
+            }
+            
+            .score-display {
+                font-size: 1.2em;
+            }
+            
+            .instructions {
+                font-size: 1em;
+                margin: 20px 15px;
+            }
+        }
+
+        .perfect-indicator {
+            position: absolute;
+            top: 30%;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 2em;
+            font-weight: bold;
+            color: #00ff00;
+            text-shadow: 0 0 15px #00ff00;
+            opacity: 0;
+            animation: perfectAnim 0.8s ease-out;
+        }
+
+        @keyframes perfectAnim {
+            0% { opacity: 0; transform: translateX(-50%) translateY(20px) scale(0.8); }
+            50% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1.1); }
+            100% { opacity: 0; transform: translateX(-50%) translateY(-20px) scale(1); }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <canvas id="gameCanvas"></canvas>
+        
+        <div class="ui-overlay">
+            <div class="score-display">
+                <div class="score-item">
+                    Puntos: <span id="score">0</span>
+                </div>
+                <div class="score-item">
+                    Combo: <span id="combo">0</span>
+                </div>
+                <div class="score-item">
+                    Precisión: <span id="accuracy">100</span>%
+                </div>
+            </div>
+        </div>
+
+        <div class="start-screen" id="startScreen">
+            <h1>🎹 MAGIC PIANO TILES</h1>
+            <div class="instructions">
+                <p>🎵 Toca las baldosas negras al ritmo de la música</p>
+                <p>🎯 ¡No toques las baldosas blancas!</p>
+                <p>⚡ Consigue combos para más puntos</p>
+                <p>🏆 ¡Alcanza la mayor puntuación posible!</p>
+            </div>
+            
+            <div class="difficulty-selector">
+                <button class="difficulty-btn active" data-difficulty="easy">Fácil</button>
+                <button class="difficulty-btn" data-difficulty="medium">Medio</button>
+                <button class="difficulty-btn" data-difficulty="hard">Difícil</button>
+            </div>
+            
+            <button class="btn" onclick="iniciarJuego()">🎮 EMPEZAR A TOCAR</button>
+            
+            <div style="margin-top: 30px; font-size: 0.9em; opacity: 0.7;">
+                <p>🎹 Cada baldosa genera una nota musical diferente</p>
+                <p>📱 Compatible con dispositivos móviles y táctiles</p>
+            </div>
+        </div>
+
+        <div class="game-over-screen" id="gameOverScreen" style="display: none;">
+            <h2 style="font-size: 2.5em; margin-bottom: 20px; color: #ff6b6b;">🎵 ¡Fin del Juego!</h2>
+            <div style="font-size: 1.5em; margin-bottom: 30px;">
+                <p>Puntuación Final: <span id="finalScore" style="color: #4ecdc4;">0</span></p>
+                <p>Mejor Combo: <span id="bestCombo" style="color: #ffff00;">0</span></p>
+                <p>Precisión Final: <span id="finalAccuracy" style="color: #ff6b6b;">0</span>%</p>
+                <p>Baldosas Tocadas: <span id="tilesHit" style="color: #45b7d1;">0</span></p>
+            </div>
+            <button class="btn" onclick="reiniciarJuego()">🔄 JUGAR DE NUEVO</button>
+            <button class="btn" onclick="volverMenu()">🏠 MENÚ PRINCIPAL</button>
+        </div>
+    </div>
+
+    <script>
+        // ========================================
+        // CONFIGURACIÓN Y VARIABLES GLOBALES
+        // ========================================
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let gameState = 'menu'; // 'menu', 'playing', 'gameOver'
+        let gameSpeed = 2;
+        let score = 0;
+        let combo = 0;
+        let maxCombo = 0;
+        let totalTiles = 0;
+        let hitTiles = 0;
+        let missedTiles = 0;
+        let difficulty = 'easy';
+
+        // Configuración de dificultad
+        const difficultySettings = {
+            easy: { speed: 2, spawnRate: 0.012, minGap: 80 },
+            medium: { speed: 3, spawnRate: 0.018, minGap: 60 },
+            hard: { speed: 4.5, spawnRate: 0.025, minGap: 40 }
+        };
+
+        // Sistema de audio
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const notes = {
+            C4: 261.63,
+            D4: 293.66,
+            E4: 329.63,
+            F4: 349.23,
+            G4: 392.00,
+            A4: 440.00,
+            B4: 493.88,
+            C5: 523.25
+        };
+
+        const noteNames = Object.keys(notes);
+        let tiles = [];
+        let particles = [];
+
+        function ajustarCanvas() {
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+        }
+
+        ajustarCanvas();
+        window.addEventListener('resize', ajustarCanvas);
+
+        // ========================================
+        // SISTEMA DE AUDIO
+        // ========================================
+        function reproducirNota(frequency, duration = 0.3) {
+            if (audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+            oscillator.type = 'triangle';
+            
+            gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+            gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.01);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + duration);
+        }
+
+        function reproducirSonidoError() {
+            reproducirNota(150, 0.2);
+        }
+
+        function reproducirSonidoCombo() {
+            for (let i = 0; i < 3; i++) {
+                setTimeout(() => {
+                    reproducirNota(notes.C5 + (i * 100), 0.15);
+                }, i * 50);
+            }
+        }
+
+        // ========================================
+        // CLASE BALDOSA
+        // ========================================
+        class Tile {
+            constructor(lane) {
+                this.lane = lane;
+                this.x = (canvas.width / 4) * lane + (canvas.width / 8);
+                this.y = -100;
+                this.width = canvas.width / 4 - 10;
+                this.height = 120;
+                this.speed = difficultySettings[difficulty].speed;
+                this.hit = false;
+                this.missed = false;
+                this.note = noteNames[Math.floor(Math.random() * noteNames.length)];
+                this.hue = Math.random() * 360;
+                this.glowIntensity = 0;
+                this.scale = 1;
+            }
+
+            update() {
+                this.y += this.speed;
+                
+                // Animación de brillo
+                this.glowIntensity = Math.sin(Date.now() * 0.01) * 0.3 + 0.7;
+                
+                // Verificar si la baldosa se perdió
+                if (this.y > canvas.height + 50 && !this.hit && !this.missed) {
+                    this.missed = true;
+                    this.perderCombo();
+                    missedTiles++;
+                    totalTiles++;
+                }
+            }
+
+            draw() {
+                ctx.save();
+                
+                // Sombra
+                ctx.shadowColor = `hsla(${this.hue}, 70%, 50%, 0.8)`;
+                ctx.shadowBlur = this.hit ? 0 : 20 * this.glowIntensity;
+                
+                // Transformaciones para animación
+                ctx.translate(this.x + this.width/2, this.y + this.height/2);
+                ctx.scale(this.scale, this.scale);
+                ctx.translate(-this.width/2, -this.height/2);
+                
+                // Baldosa principal
+                if (this.hit) {
+                    const gradient = ctx.createLinearGradient(0, 0, this.width, this.height);
+                    gradient.addColorStop(0, `hsla(${this.hue}, 80%, 70%, 0.8)`);
+                    gradient.addColorStop(1, `hsla(${this.hue + 30}, 80%, 40%, 0.8)`);
+                    ctx.fillStyle = gradient;
+                } else {
+                    const gradient = ctx.createLinearGradient(0, 0, this.width, this.height);
+                    gradient.addColorStop(0, '#1a1a1a');
+                    gradient.addColorStop(0.5, '#2d2d2d');
+                    gradient.addColorStop(1, '#1a1a1a');
+                    ctx.fillStyle = gradient;
+                }
+                
+                // Dibujar baldosa con bordes redondeados
+                this.drawRoundedRect(0, 0, this.width, this.height, 15);
+                ctx.fill();
+                
+                // Borde brillante
+                ctx.strokeStyle = this.hit ? 
+                    `hsla(${this.hue}, 100%, 80%, 0.9)` : 
+                    `rgba(255, 255, 255, ${0.3 * this.glowIntensity})`;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                
+                // Nota musical
+                if (!this.hit) {
+                    ctx.fillStyle = `rgba(255, 255, 255, ${0.8 * this.glowIntensity})`;
+                    ctx.font = 'bold 24px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(this.note, this.width/2, this.height/2 + 8);
+                }
+                
+                ctx.restore();
+            }
+
+            drawRoundedRect(x, y, width, height, radius) {
+                ctx.beginPath();
+                ctx.moveTo(x + radius, y);
+                ctx.lineTo(x + width - radius, y);
+                ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+                ctx.lineTo(x + width, y + height - radius);
+                ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+                ctx.lineTo(x + radius, y + height);
+                ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+                ctx.lineTo(x, y + radius);
+                ctx.quadraticCurveTo(x, y, x + radius, y);
+                ctx.closePath();
+            }
+
+            checkHit(mouseX, mouseY) {
+                const hitZone = canvas.height - 200;
+                const tolerance = 100;
+                
+                if (this.hit || this.missed) return false;
+                
+                if (mouseX >= this.x - 10 && mouseX <= this.x + this.width + 10 &&
+                    this.y >= hitZone - tolerance && this.y <= hitZone + tolerance + this.height) {
+                    return this.onHit();
+                }
+                return false;
+            }
+
+            onHit() {
+                if (this.hit || this.missed) return false;
+                
+                this.hit = true;
+                this.scale = 1.1;
+                
+                // Reproducir nota
+                reproducirNota(notes[this.note]);
+                
+                // Calcular puntuación basada en precisión
+                const hitZone = canvas.height - 200;
+                const distanceFromPerfect = Math.abs(this.y - hitZone);
+                const maxDistance = 100;
+                const accuracy = Math.max(0, 1 - (distanceFromPerfect / maxDistance));
+                
+                let points = Math.floor(100 * accuracy);
+                
+                // Bonus por combo
+                if (combo >= 10) points *= 2;
+                else if (combo >= 5) points *= 1.5;
+                
+                score += points;
+                combo++;
+                maxCombo = Math.max(maxCombo, combo);
+                hitTiles++;
+                totalTiles++;
+                
+                // Efectos visuales
+                this.crearParticulas();
+                
+                // Mostrar indicador de precisión
+                if (accuracy > 0.9) {
+                    this.mostrarIndicador("PERFECT!");
+                }
+                
+                // Sonido especial para combos altos
+                if (combo > 0 && combo % 10 === 0) {
+                    reproducirSonidoCombo();
+                    this.mostrarCombo();
+                }
+                
+                this.actualizarUI();
+                return true;
+            }
+
+            perderCombo() {
+                if (combo > 0) {
+                    reproducirSonidoError();
+                    combo = 0;
+                    this.actualizarUI();
+                }
+            }
+
+            crearParticulas() {
+                for (let i = 0; i < 12; i++) {
+                    particles.push({
+                        x: this.x + this.width/2,
+                        y: this.y + this.height/2,
+                        vx: (Math.random() - 0.5) * 10,
+                        vy: (Math.random() - 0.5) * 10 - 5,
+                        life: 1.0,
+                        color: `hsla(${this.hue}, 80%, 60%, 1)`,
+                        size: Math.random() * 4 + 2
+                    });
+                }
+            }
+
+            mostrarIndicador(text) {
+                const indicator = document.createElement('div');
+                indicator.className = 'perfect-indicator';
+                indicator.textContent = text;
+                document.querySelector('.game-container').appendChild(indicator);
+                setTimeout(() => indicator.remove(), 800);
+            }
+
+            mostrarCombo() {
+                const comboEl = document.createElement('div');
+                comboEl.className = 'combo-display';
+                comboEl.textContent = `COMBO x${combo}!`;
+                document.querySelector('.game-container').appendChild(comboEl);
+                setTimeout(() => comboEl.remove(), 1000);
+            }
+
+            actualizarUI() {
+                document.getElementById('score').textContent = score.toLocaleString();
+                document.getElementById('combo').textContent = combo;
+                const accuracy = totalTiles > 0 ? Math.round((hitTiles / totalTiles) * 100) : 100;
+                document.getElementById('accuracy').textContent = accuracy;
+            }
+        }
+
+        // ========================================
+        // LÓGICA PRINCIPAL DEL JUEGO
+        // ========================================
+        function iniciarJuego() {
+            // Activar contexto de audio
+            if (audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+            
+            gameState = 'playing';
+            document.getElementById('startScreen').style.display = 'none';
+            
+            // Resetear variables
+            tiles = [];
+            particles = [];
+            score = 0;
+            combo = 0;
+            maxCombo = 0;
+            totalTiles = 0;
+            hitTiles = 0;
+            missedTiles = 0;
+            
+            gameSpeed = difficultySettings[difficulty].speed;
+            
+            gameLoop();
+        }
+
+        function gameLoop() {
+            if (gameState !== 'playing') return;
+            
+            // Limpiar canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Dibujar fondo
+            dibujarFondo();
+            
+            // Generar nuevas baldosas
+            if (Math.random() < difficultySettings[difficulty].spawnRate) {
+                generarBaldosa();
+            }
+            
+            // Actualizar y dibujar baldosas
+            tiles.forEach((tile, index) => {
+                tile.update();
+                tile.draw();
+                
+                // Eliminar baldosas que salieron de pantalla
+                if (tile.y > canvas.height + 100) {
+                    tiles.splice(index, 1);
+                }
+            });
+            
+            // Actualizar y dibujar partículas
+            actualizarParticulas();
+            
+            // Dibujar zona de toque
+            dibujarZonaToque();
+            
+            // Verificar fin del juego
+            if (missedTiles >= 5) {
+                terminarJuego();
+                return;
+            }
+            
+            requestAnimationFrame(gameLoop);
+        }
+
+        function generarBaldosa() {
+            const lane = Math.floor(Math.random() * 4);
+            
+            // Evitar baldosas muy cercanas en la misma columna
+            const lastTileInLane = tiles.filter(t => t.lane === lane).pop();
+            if (lastTileInLane && Math.abs(lastTileInLane.y - (-100)) < difficultySettings[difficulty].minGap) {
+                return;
+            }
+            
+            tiles.push(new Tile(lane));
+        }
+
+        function dibujarFondo() {
+            // Fondo degradado dinámico
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            const hue = (Date.now() * 0.05) % 360;
+            gradient.addColorStop(0, `hsla(${hue}, 20%, 10%, 1)`);
+            gradient.addColorStop(0.5, `hsla(${hue + 60}, 30%, 15%, 1)`);
+            gradient.addColorStop(1, `hsla(${hue + 120}, 20%, 20%, 1)`);
+            
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Líneas de separación entre carriles
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+            ctx.lineWidth = 2;
+            for (let i = 1; i < 4; i++) {
+                const x = (canvas.width / 4) * i;
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            
+            // Efecto de líneas de velocidad
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+            ctx.lineWidth = 1;
+            const offset = (Date.now() * gameSpeed * 0.1) % 50;
+            for (let y = -50 + offset; y < canvas.height + 50; y += 50) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+        }
+
+        function dibujarZonaToque() {
+            const hitZone = canvas.height - 200;
+            
+            // Zona de toque principal
+            const gradient = ctx.createLinearGradient(0, hitZone, 0, hitZone + 150);
+            gradient.addColorStop(0, 'rgba(78, 205, 196, 0.3)');
+            gradient.addColorStop(0.5, 'rgba(78, 205, 196, 0.6)');
+            gradient.addColorStop(1, 'rgba(78, 205, 196, 0.3)');
+            
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, hitZone, canvas.width, 150);
+            
+            // Línea de referencia
+            ctx.strokeStyle = '#4ecdc4';
+            ctx.lineWidth = 3;
+            ctx.shadowColor = '#4ecdc4';
+            ctx.shadowBlur = 10;
+            ctx.beginPath();
+            ctx.moveTo(0, hitZone + 75);
+            ctx.lineTo(canvas.width, hitZone + 75);
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+        }
+
+        function actualizarParticulas() {
+            particles.forEach((particle, index) => {
+                particle.x += particle.vx;
+                particle.y += particle.vy;
+                particle.vy += 0.3; // Gravedad
+                particle.life -= 0.02;
+                
+                if (particle.life <= 0) {
+                    particles.splice(index, 1);
+                    return;
+                }
+                
+                // Dibujar partícula
+                ctx.save();
+                ctx.globalAlpha = particle.life;
+                ctx.fillStyle = particle.color;
+                ctx.beginPath();
+                ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            });
+        }
+
+        function terminarJuego() {
+            gameState = 'gameOver';
+            
+            // Actualizar estadísticas finales
+            document.getElementById('finalScore').textContent = score.toLocaleString();
+            document.getElementById('bestCombo').textContent = maxCombo;
+            const finalAccuracy = totalTiles > 0 ? Math.round((hitTiles / totalTiles) * 100) : 100;
+            document.getElementById('finalAccuracy').textContent = finalAccuracy;
+            document.getElementById('tilesHit').textContent = hitTiles;
+            
+            // Mostrar pantalla de fin de juego
+            document.getElementById('gameOverScreen').style.display = 'flex';
+        }
+
+        function reiniciarJuego() {
+            document.getElementById('gameOverScreen').style.display = 'none';
+            iniciarJuego();
+        }
+
+        function volverMenu() {
+            gameState = 'menu';
+            document.getElementById('gameOverScreen').style.display = 'none';
+            document.getElementById('startScreen').style.display = 'flex';
+        }
+
+        // ========================================
+        // CONTROLES Y EVENTOS
+        // ========================================
+        
+        // Manejo de clics del mouse
+        canvas.addEventListener('click', (e) => {
+            if (gameState !== 'playing') return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            manejarToque(x, y);
+        });
+
+        // Manejo de toques táctiles
+        canvas.addEventListener('touchstart', (e) => {
+            if (gameState !== 'playing') return;
+            e.preventDefault();
+            
+            Array.from(e.touches).forEach(touch => {
+                const rect = canvas.getBoundingClientRect();
+                const x = touch.clientX - rect.left;
+                const y = touch.clientY - rect.top;
+                manejarToque(x, y);
+            });
+        });
+
+        function manejarToque(x, y) {
+            let hit = false;
+            
+            // Verificar si se
